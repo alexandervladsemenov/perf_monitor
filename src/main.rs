@@ -61,11 +61,13 @@ async fn run_monitor(process_name: &str) {
         println!("Running process {}", process_name);
         let mut cpu_usage: f32;
         let mut memory_usage: u64;
+        let mut disk_info : (u64,u64,u64,u64);
         loop {
             let res = mon.monitor();
-            if let Some((mem, cpu, _)) = res {
+            if let Some((mem, cpu, diskutil)) = res {
                 cpu_usage = cpu;
                 memory_usage = mem;
+                disk_info = (diskutil.read_bytes,diskutil.total_read_bytes,diskutil.written_bytes,diskutil.total_written_bytes);
             } else {
                 println!("Process has ended 💖💖💖💖💖\n");
                 break;
@@ -73,12 +75,12 @@ async fn run_monitor(process_name: &str) {
             let end = Instant::now();
             let duration = end.duration_since(start_time);
             println!(
-                "Time: {:?}, Cpu usage: {}, memory usage: {} MB",
+                "Time: {:?}, Cpu usage: {}, memory usage: {} MB, disk util {:?}",
                 duration.as_millis(),
                 cpu_usage,
-                memory_usage as f32 / 1024.0 / 1024.0
+                memory_usage as f32 / 1024.0 / 1024.0,disk_info
             );
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(50)).await;
         }
     } else {
         println!("Process {} not found 😍😍😍😍\n", process_name);

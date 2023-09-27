@@ -61,7 +61,7 @@ async fn run_monitor(process_name: &str) {
     sleep(Duration::from_millis(1)).await; // make sure that the process is running
     let start_time = Instant::now();
     let mut file = OpenOptions::new()
-    .create_new(true).write(true)
+    .create(true).write(true)
     .append(true)
     .open("log.txt")
     .unwrap();

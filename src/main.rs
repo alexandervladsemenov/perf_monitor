@@ -82,18 +82,18 @@ async fn run_monitor(process_name: &str) {
             }
             let end = Instant::now();
             let duration = end.duration_since(start_time);
-            let res = writeln!(file,"Time: {:?}",duration.as_millis());
-            if res.is_err()
-            {
-                println!("Error : can't write the file");
-                process::exit(0x0100);
-            }
-            println!(
+            let res = writeln!(file,
                 "Time: {:?}, Cpu usage: {}, memory usage: {} MB, disk util {:?}",
                 duration.as_millis(),
                 cpu_usage,
                 memory_usage as f32 / 1024.0 / 1024.0,disk_info
             );
+
+            if res.is_err()
+            {
+                println!("Error : can't write the file");
+                process::exit(0x0100);
+            }
             sleep(Duration::from_millis(50)).await;
         }
     } else {

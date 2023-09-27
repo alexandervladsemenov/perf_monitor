@@ -3,6 +3,9 @@ use std::time::Instant;
 use sysinfo::{DiskUsage, Pid, ProcessExt, System, SystemExt};
 use tokio;
 use tokio::time::{sleep, Duration};
+use std::fs::OpenOptions;
+use std::io::prelude::*;
+use std::process;
 pub struct Monitor {
     sys: System,
     pid: Pid,
@@ -57,6 +60,11 @@ fn parse_cli() -> (Option<String>, Vec<String>) {
 async fn run_monitor(process_name: &str) {
     sleep(Duration::from_millis(1)).await; // make sure that the process is running
     let start_time = Instant::now();
+    let mut file = OpenOptions::new()
+    .create_new(true).write(true)
+    .append(true)
+    .open("log.txt")
+    .unwrap();
     if let Some(mut mon) = Monitor::new(process_name) {
         println!("Running process {}", process_name);
         let mut cpu_usage: f32;
@@ -74,6 +82,12 @@ async fn run_monitor(process_name: &str) {
             }
             let end = Instant::now();
             let duration = end.duration_since(start_time);
+            let res = writeln!(file,"Time: {:?}",duration.as_millis());
+            if res.is_err()
+            {
+                println!("Error : can't write the file");
+                process::exit(0x0100);
+            }
             println!(
                 "Time: {:?}, Cpu usage: {}, memory usage: {} MB, disk util {:?}",
                 duration.as_millis(),

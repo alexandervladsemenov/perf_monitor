@@ -62,7 +62,6 @@ fn read_line() -> io::Result<String> {
     let mut buffer = String::new();
     let stdin = io::stdin(); // We get `Stdin` here.
     stdin.read_line(&mut buffer)?;
-    println!("{buffer}");
     Ok(buffer)
 }
 
@@ -71,9 +70,13 @@ async fn read_command()
     loop {
         if let Ok(res) = read_line()
         {
-            if res.eq_ignore_ascii_case("END")
+            if res.eq("END\n")
             {
+                println!("The user wants to end this");
                 break;
+            }
+            else {
+                println!("The user entered word {}",res)
             }
         }
     }

@@ -1,5 +1,6 @@
 use clap::{Arg, ArgAction, Command};
-use std::fs::{OpenOptions, File};
+use std::fs::{File, OpenOptions};
+use std::io;
 use std::io::prelude::*;
 use std::process;
 use std::time::Instant;
@@ -57,8 +58,28 @@ fn parse_cli() -> (Option<String>, Vec<String>) {
     }
 }
 
-async fn write_log(mon : & mut Monitor, start_time : &Instant, file : & mut File)
+fn read_line() -> io::Result<String> {
+    let mut buffer = String::new();
+    let stdin = io::stdin(); // We get `Stdin` here.
+    stdin.read_line(&mut buffer)?;
+    println!("{buffer}");
+    Ok(buffer)
+}
+
+async fn read_command()
 {
+    loop {
+        if let Ok(res) = read_line()
+        {
+            if res.eq_ignore_ascii_case("END")
+            {
+                break;
+            }
+        }
+    }
+}
+
+async fn write_log(mon: &mut Monitor, start_time: &Instant, file: &mut File) {
     loop {
         let cpu_usage: f32;
         let memory_usage: u64;
@@ -101,10 +122,7 @@ async fn run_monitor(process_name: &str) {
 
     if let Some(mut mon) = Monitor::new(process_name) {
         let pid = mon.pid.to_string();
-        println!(
-            "Running process {} and process id {:?}",
-            process_name, pid
-        );
+        println!("Running process {} and process id {:?}", process_name, pid);
         let start_time = Instant::now();
         let filename = format!("log_pid_{pid}_name_{process_name}.txt");
         let mut file = OpenOptions::new()
@@ -123,8 +141,26 @@ async fn run_monitor(process_name: &str) {
 async fn main() {
     let ret = parse_cli();
     // println!("{:?}",ret);
-    if let Some(process_name) = ret.0 {
-        let f = run_monitor(&process_name);
-        f.await;
-    };
+    let handle_read = tokio::spawn(async {
+        // Do some async work
+        read_command().await;
+    });
+    let handle_monitor = tokio::spawn(async {
+        // Do some async work
+        if let Some(process_name) = ret.0 {
+            run_monitor(&process_name).await;
+        };
+    });
+    let res1 = handle_monitor.await;
+    let res2 = handle_read.await;
+    if res1.is_err()
+    {
+        println!("Something went wrong with the monitor");
+
+    }
+    if res2.is_err()
+    {
+        println!("Something went wrong with the reader");
+    }
+
 }

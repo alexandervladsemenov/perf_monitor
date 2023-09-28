@@ -6,6 +6,7 @@ use std::process;
 use std::time::Instant;
 use sysinfo::{DiskUsage, Pid, ProcessExt, System, SystemExt};
 use tokio;
+use tokio::sync::oneshot;
 use tokio::time::{sleep, Duration};
 pub struct Monitor {
     sys: System,
@@ -65,18 +66,14 @@ fn read_line() -> io::Result<String> {
     Ok(buffer)
 }
 
-async fn read_command()
-{
+async fn read_command() -> bool {
     loop {
-        if let Ok(res) = read_line()
-        {
-            if res.eq("END\n")
-            {
+        if let Ok(res) = read_line() {
+            if res.eq("END\n") {
                 println!("The user wants to end this");
-                break;
-            }
-            else {
-                println!("The user entered word {}",res)
+                return true;
+            } else {
+                println!("The user entered word {}", res)
             }
         }
     }
@@ -143,11 +140,26 @@ async fn run_monitor(process_name: &str) {
 #[tokio::main]
 async fn main() {
     let ret = parse_cli();
-    // println!("{:?}",ret);
-    let handle_read = tokio::spawn(async {
-        // Do some async work
-        read_command().await;
+
+    let (sender, receiver) = oneshot::channel::<usize>();
+    let handle_get_reciver = tokio::spawn(async move {
+        let result = receiver.await;
+        if let Ok(val) = result
+        {
+            println!("Finally recieved a value {}",val);
+        }
     });
+    // println!("{:?}",ret);
+    let handle_read = tokio::spawn(async move {
+        // Do some async work
+        let res = read_command().await;
+        if res {
+            if sender.send(4usize).is_err() {
+                println!("Could not send for some reason");
+            }
+        }
+    });
+
     let handle_monitor = tokio::spawn(async {
         // Do some async work
         if let Some(process_name) = ret.0 {
@@ -156,14 +168,14 @@ async fn main() {
     });
     let res1 = handle_monitor.await;
     let res2 = handle_read.await;
-    if res1.is_err()
-    {
+    let res3 = handle_get_reciver.await;
+    if res1.is_err() {
         println!("Something went wrong with the monitor");
-
     }
-    if res2.is_err()
-    {
+    if res2.is_err() {
         println!("Something went wrong with the reader");
     }
-
+    if res3.is_err() {
+        println!("Something went wrong with recieving");
+    }
 }

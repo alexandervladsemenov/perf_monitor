@@ -1,11 +1,11 @@
 use clap::{Arg, ArgAction, Command};
+use std::fs::{OpenOptions, File};
+use std::io::prelude::*;
+use std::process;
 use std::time::Instant;
 use sysinfo::{DiskUsage, Pid, ProcessExt, System, SystemExt};
 use tokio;
 use tokio::time::{sleep, Duration};
-use std::fs::OpenOptions;
-use std::io::prelude::*;
-use std::process;
 pub struct Monitor {
     sys: System,
     pid: Pid,
@@ -57,45 +57,64 @@ fn parse_cli() -> (Option<String>, Vec<String>) {
     }
 }
 
+async fn write_log(mon : & mut Monitor, start_time : &Instant, file : & mut File)
+{
+    loop {
+        let cpu_usage: f32;
+        let memory_usage: u64;
+        let disk_info: (u64, u64, u64, u64);
+        let res = mon.monitor();
+        if let Some((mem, cpu, diskutil)) = res {
+            cpu_usage = cpu;
+            memory_usage = mem;
+            disk_info = (
+                diskutil.read_bytes,
+                diskutil.total_read_bytes,
+                diskutil.written_bytes,
+                diskutil.total_written_bytes,
+            );
+        } else {
+            println!("Process has ended 💖💖💖💖💖\n");
+            break;
+        }
+        let end = Instant::now();
+        let duration = end.duration_since(*start_time);
+        let res = writeln!(
+            file,
+            "Time: {:?}, Cpu usage: {}, memory usage: {} MB, disk util {:?}",
+            duration.as_millis(),
+            cpu_usage,
+            memory_usage as f32 / 1024.0 / 1024.0,
+            disk_info
+        );
+
+        if res.is_err() {
+            println!("Error : can't write the file");
+            process::exit(0x0100);
+        }
+        sleep(Duration::from_millis(50)).await;
+    }
+}
+
 async fn run_monitor(process_name: &str) {
     sleep(Duration::from_millis(1)).await; // make sure that the process is running
-    let start_time = Instant::now();
-    let mut file = OpenOptions::new()
-    .create(true).write(true)
-    .append(true)
-    .open("log.txt")
-    .unwrap();
-    if let Some(mut mon) = Monitor::new(process_name) {
-        println!("Running process {}", process_name);
-        let mut cpu_usage: f32;
-        let mut memory_usage: u64;
-        let mut disk_info : (u64,u64,u64,u64);
-        loop {
-            let res = mon.monitor();
-            if let Some((mem, cpu, diskutil)) = res {
-                cpu_usage = cpu;
-                memory_usage = mem;
-                disk_info = (diskutil.read_bytes,diskutil.total_read_bytes,diskutil.written_bytes,diskutil.total_written_bytes);
-            } else {
-                println!("Process has ended 💖💖💖💖💖\n");
-                break;
-            }
-            let end = Instant::now();
-            let duration = end.duration_since(start_time);
-            let res = writeln!(file,
-                "Time: {:?}, Cpu usage: {}, memory usage: {} MB, disk util {:?}",
-                duration.as_millis(),
-                cpu_usage,
-                memory_usage as f32 / 1024.0 / 1024.0,disk_info
-            );
 
-            if res.is_err()
-            {
-                println!("Error : can't write the file");
-                process::exit(0x0100);
-            }
-            sleep(Duration::from_millis(50)).await;
-        }
+    if let Some(mut mon) = Monitor::new(process_name) {
+        let pid = mon.pid.to_string();
+        println!(
+            "Running process {} and process id {:?}",
+            process_name, pid
+        );
+        let start_time = Instant::now();
+        let filename = format!("log_pid_{pid}_name_{process_name}.txt");
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(true)
+            .open(filename)
+            .unwrap();
+        let writer_f = write_log(&mut mon, &start_time, &mut file);
+        writer_f.await;
     } else {
         println!("Process {} not found 😍😍😍😍\n", process_name);
     }
@@ -104,8 +123,7 @@ async fn run_monitor(process_name: &str) {
 async fn main() {
     let ret = parse_cli();
     // println!("{:?}",ret);
-    if let Some(process_name) = ret.0 
-    {
+    if let Some(process_name) = ret.0 {
         let f = run_monitor(&process_name);
         f.await;
     };

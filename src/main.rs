@@ -3,12 +3,12 @@ use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::prelude::*;
 use std::process;
+use std::sync::Arc;
 use std::time::Instant;
 use sysinfo::{DiskUsage, Pid, ProcessExt, System, SystemExt};
 use tokio;
-use tokio::time::{sleep, Duration};
 use tokio::sync::Mutex;
-use std::sync::Arc;
+use tokio::time::{sleep, Duration};
 pub struct Monitor {
     sys: System,
     pid: Pid,
@@ -80,8 +80,13 @@ async fn read_command() -> bool {
     }
 }
 
-async fn write_log(mon: &mut Monitor, start_time: &Instant, file: &mut File) {
-    loop {
+async fn write_log(
+    mon: &mut Monitor,
+    start_time: &Instant,
+    file: &mut File,
+    flag: Arc<Mutex<i32>>,
+) {
+    'outer: loop {
         let cpu_usage: f32;
         let memory_usage: u64;
         let disk_info: (u64, u64, u64, u64);
@@ -97,7 +102,7 @@ async fn write_log(mon: &mut Monitor, start_time: &Instant, file: &mut File) {
             );
         } else {
             println!("Process has ended 💖💖💖💖💖\n");
-            break;
+            break 'outer;
         }
         let end = Instant::now();
         let duration = end.duration_since(*start_time);
@@ -114,11 +119,23 @@ async fn write_log(mon: &mut Monitor, start_time: &Instant, file: &mut File) {
             println!("Error : can't write the file");
             process::exit(0x0100);
         }
-        sleep(Duration::from_millis(50)).await;
+
+        let total_sleep_time = 50u64;
+        let mut current_sleep = 0u64;
+        let increment = 5u64;
+        while current_sleep < total_sleep_time {
+            let lock = flag.lock().await;
+            if *lock > 0 {
+                println!("Stop Monitoring");
+                break 'outer;
+            }
+            sleep(Duration::from_millis(increment)).await;
+            current_sleep += increment;
+        }
     }
 }
 
-async fn run_monitor(process_name: &str) {
+async fn run_monitor(process_name: &str, flag: Arc<Mutex<i32>>) {
     sleep(Duration::from_millis(1)).await; // make sure that the process is running
 
     if let Some(mut mon) = Monitor::new(process_name) {
@@ -132,7 +149,7 @@ async fn run_monitor(process_name: &str) {
             .append(true)
             .open(filename)
             .unwrap();
-        let writer_f = write_log(&mut mon, &start_time, &mut file);
+        let writer_f = write_log(&mut mon, &start_time, &mut file, flag);
         writer_f.await;
     } else {
         println!("Process {} not found 😍😍😍😍\n", process_name);
@@ -141,50 +158,30 @@ async fn run_monitor(process_name: &str) {
 #[tokio::main]
 async fn main() {
     let ret = parse_cli();
-    let data1 = Arc::new(Mutex::new(0));
-    let data2 = Arc::clone(&data1);
-    let handle_get_reciver = tokio::spawn(async move {
-        // let result = receiver.await;
-        loop {
-            if *data1.lock().await >= 1 {
-                println!("The USER ENDED IT");
-                break;
-            }
-            sleep(Duration::from_secs(1)).await;
-            println!("Waiting for value to sleep");
-        }
-        // if let Ok(val) = result
-        // {
-        //     println!("Finally recieved a value {}",val);
-        // }
-    });
+    let flag1 = Arc::new(Mutex::new(0));
+    let flag2 = Arc::clone(&flag1);
     // println!("{:?}",ret);
     let handle_read = tokio::spawn(async move {
         // Do some async work
         let res = read_command().await;
-
         if res {
-            let mut lock = data2.lock().await;
+            let mut lock = flag2.lock().await;
             *lock += 1;
         }
     });
 
-    let handle_monitor = tokio::spawn(async {
+    let handle_monitor = tokio::spawn(async move {
         // Do some async work
         if let Some(process_name) = ret.0 {
-            run_monitor(&process_name).await;
+            run_monitor(&process_name, flag1).await;
         };
     });
     let res1 = handle_monitor.await;
     let res2 = handle_read.await;
-    let res3 = handle_get_reciver.await;
     if res1.is_err() {
         println!("Something went wrong with the monitor");
     }
     if res2.is_err() {
         println!("Something went wrong with the reader");
-    }
-    if res3.is_err() {
-        println!("Something went wrong with recieving");
     }
 }

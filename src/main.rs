@@ -70,8 +70,9 @@ fn read_line() -> io::Result<String> {
 async fn read_command() -> bool {
     loop {
         if let Ok(res) = read_line() {
-            if res.eq("END\n") {
-                println!("The user wants to end this");
+            let trimmed = res.trim();
+            if trimmed.eq("END") {
+                println!("The user wants to end this {:?} with len {}",res.as_bytes(),res.len());
                 return true;
             } else {
                 println!("The user entered word {}", res)

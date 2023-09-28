@@ -6,8 +6,9 @@ use std::process;
 use std::time::Instant;
 use sysinfo::{DiskUsage, Pid, ProcessExt, System, SystemExt};
 use tokio;
-use tokio::sync::oneshot;
 use tokio::time::{sleep, Duration};
+use tokio::sync::Mutex;
+use std::sync::Arc;
 pub struct Monitor {
     sys: System,
     pid: Pid,
@@ -140,23 +141,31 @@ async fn run_monitor(process_name: &str) {
 #[tokio::main]
 async fn main() {
     let ret = parse_cli();
-
-    let (sender, receiver) = oneshot::channel::<usize>();
+    let data1 = Arc::new(Mutex::new(0));
+    let data2 = Arc::clone(&data1);
     let handle_get_reciver = tokio::spawn(async move {
-        let result = receiver.await;
-        if let Ok(val) = result
-        {
-            println!("Finally recieved a value {}",val);
+        // let result = receiver.await;
+        loop {
+            if *data1.lock().await >= 1 {
+                println!("The USER ENDED IT");
+                break;
+            }
+            sleep(Duration::from_secs(1)).await;
+            println!("Waiting for value to sleep");
         }
+        // if let Ok(val) = result
+        // {
+        //     println!("Finally recieved a value {}",val);
+        // }
     });
     // println!("{:?}",ret);
     let handle_read = tokio::spawn(async move {
         // Do some async work
         let res = read_command().await;
+
         if res {
-            if sender.send(4usize).is_err() {
-                println!("Could not send for some reason");
-            }
+            let mut lock = data2.lock().await;
+            *lock += 1;
         }
     });
 

@@ -125,9 +125,9 @@ async fn write_log(
             process::exit(0x0100);
         }
 
-        let total_sleep_time = 50u64;
+        let total_sleep_time = 30u64; // needs to be supplied by the user
         let mut current_sleep = 0u64;
-        let increment = 5u64;
+        let increment = 5u64;// needs to be supplied by the user
         while current_sleep < total_sleep_time {
             let lock = flag.lock().await;
             if *lock > 0 {
@@ -156,8 +156,6 @@ async fn run_monitor(process_name: &str, flag: Arc<Mutex<i32>>) {
             .unwrap();
         let writer_f = write_log(&mut mon, &start_time, &mut file, flag);
         writer_f.await;
-    } else {
-        println!("Process {} not found 😍😍😍😍\n", process_name);
     }
 }
 #[tokio::main]
@@ -199,11 +197,10 @@ async fn main() {
                     && (process_name != savedprocessedname
                         || set_of_process_of_interest.contains(&process_name))
                 {
-                    println!("The user wants {} and {}", process_name, savedprocessedname);
                     savedprocessedname = process_name.clone();
                     run_monitor(&process_name, flag3).await;
                 }
-                sleep(Duration::from_millis(500)).await;
+                sleep(Duration::from_millis(10)).await;
             }
         }
     });

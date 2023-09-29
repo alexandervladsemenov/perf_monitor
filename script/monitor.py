@@ -2,7 +2,7 @@ import os
 from matplotlib import pyplot as plt
 import re
 import numpy as np
-
+import argparse
 path_format = "Time: 2240, Cpu usage: 0, memory usage: 119.546875 MB, disk util (0, 26071040, 0, 323584)"
 
 
@@ -19,12 +19,19 @@ def get_val(line: str) -> list[float]:
     new_st = new_st.replace(')', ' ')
     _data_ = re.split(', | ', new_st)
     numeric = [float(s) for s in _data_ if isfloat(s)]
-    print(numeric)
     return numeric
 
 
 if __name__ == "__main__":
-    files = [os.path.join("../", x) for x in os.listdir("../") if ".txt" in x and "log" in x]
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--ifile", nargs='*', type=str,
+                        help="Provide a list of files to analyze",
+                        default=None)
+    files = [os.path.join("../", x)
+             for x in os.listdir("../") if ".txt" in x and "log" in x]
+    args = parser.parse_args()
+    if args.ifile:
+        files = args.ifile
     print(files)
     for file in files:
         time = []

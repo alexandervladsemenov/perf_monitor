@@ -67,15 +67,18 @@ fn read_line() -> io::Result<String> {
     Ok(buffer)
 }
 
-async fn read_command() -> bool {
+async fn read_command(process_name: Arc<Mutex<String>>) -> bool {
     loop {
         if let Ok(res) = read_line() {
             let trimmed = res.trim();
             if trimmed.eq("END") {
-                println!("The user wants to end this {:?} with len {}",res.as_bytes(),res.len());
-                return true;
+                println!(
+                    "ENDING THE PROGRAM 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥸 🤩 🥳 😏",
+                );
+                return true
             } else {
-                println!("The user entered word {}", res)
+                println!("The user requested the process {}", trimmed);
+                *process_name.lock().await = trimmed.to_string();
             }
         }
     }
@@ -126,8 +129,9 @@ async fn write_log(
         let increment = 5u64;
         while current_sleep < total_sleep_time {
             let lock = flag.lock().await;
+            println!("Writing to the screen");
             if *lock > 0 {
-                println!("Stop Monitoring");
+                println!("Stop Monitoring: 👻 💀 ☠️ 👽 👾 🤖 🎃 😺 😸 😹 😻 😼 😽 🙀 😿 😾");
                 break 'outer;
             }
             sleep(Duration::from_millis(increment)).await;
@@ -161,10 +165,12 @@ async fn main() {
     let ret = parse_cli();
     let flag1 = Arc::new(Mutex::new(0));
     let flag2 = Arc::clone(&flag1);
+    let process1 = Arc::new(Mutex::new("".to_string()));
+    let process2 = Arc::clone(&process1);
     // println!("{:?}",ret);
     let handle_read = tokio::spawn(async move {
         // Do some async work
-        let res = read_command().await;
+        let res = read_command(process2).await;
         if res {
             let mut lock = flag2.lock().await;
             *lock += 1;
@@ -175,7 +181,26 @@ async fn main() {
         // Do some async work
         if let Some(process_name) = ret.0 {
             run_monitor(&process_name, flag1).await;
-        };
+        } else {
+            loop
+            {
+                let flag3 = Arc::clone(&flag1);
+                let flag4 = Arc::clone(&flag1);
+                let lock = flag4.lock().await;
+                if *lock > 0
+                {
+                    println!("Stop monitoring!  😈 😈 😈 😈 😈");
+                    break;
+                }
+                let lock = process1.lock().await;
+                 if (*lock).len() > 0 {
+                    let process_name = (*lock).clone();
+                    println!("The user wants {}",process_name);
+                    run_monitor(&process_name, flag3).await;
+                }
+                sleep(Duration::from_millis(1)).await;
+            }
+        }
     });
     let res1 = handle_monitor.await;
     let res2 = handle_read.await;

@@ -1,4 +1,5 @@
 use clap::{Arg, ArgAction, Command};
+use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::prelude::*;
@@ -183,14 +184,22 @@ async fn main() {
         if let Some(process_name) = ret.0 {
             run_monitor(&process_name, flag1).await;
         } else {
+            let mut set_of_process_of_interest: HashSet<String> = HashSet::new();
+            for pr in ret.1 {
+                set_of_process_of_interest.insert(pr);
+            }
+
             let flag4 = Arc::clone(&flag1);
-            let mut savedprocessedname : String = "".to_string();
+            let mut savedprocessedname: String = "".to_string();
             while *(flag4.lock().await) == 0 {
                 // println!("lockr is {}",lockr);
                 let flag3 = Arc::clone(&flag1);
                 let process_name = (*process1.lock().await).clone();
-                if process_name.len() > 0 && (process_name != savedprocessedname) {
-                    println!("The user wants {} and {}", process_name,savedprocessedname);
+                if process_name.len() > 0
+                    && (process_name != savedprocessedname
+                        || set_of_process_of_interest.contains(&process_name))
+                {
+                    println!("The user wants {} and {}", process_name, savedprocessedname);
                     savedprocessedname = process_name.clone();
                     run_monitor(&process_name, flag3).await;
                 }

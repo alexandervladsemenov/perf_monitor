@@ -85,6 +85,18 @@ async fn read_command(process_name: Arc<Mutex<String>>) -> bool {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
+fn convert_cpu(cpu:f32)->f32
+{
+    cpu
+}
+
+#[cfg(target_os = "macos")]
+fn convert_cpu(cpu:f32)->f32
+{
+    cpu*100.0f32
+}
+
 async fn write_log(
     mon: &mut Monitor,
     start_time: &Instant,
@@ -97,7 +109,8 @@ async fn write_log(
         let disk_info: (u64, u64, u64, u64);
         let res = mon.monitor();
         if let Some((mem, cpu, diskutil)) = res {
-            cpu_usage = cpu;
+
+            cpu_usage = convert_cpu(cpu);
             memory_usage = mem;
             disk_info = (
                 diskutil.read_bytes,

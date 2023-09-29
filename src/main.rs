@@ -75,7 +75,7 @@ async fn read_command(process_name: Arc<Mutex<String>>) -> bool {
                 println!(
                     "ENDING THE PROGRAM 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥸 🤩 🥳 😏",
                 );
-                return true
+                return true;
             } else {
                 println!("The user requested the process {}", trimmed);
                 *process_name.lock().await = trimmed.to_string();
@@ -129,7 +129,6 @@ async fn write_log(
         let increment = 5u64;
         while current_sleep < total_sleep_time {
             let lock = flag.lock().await;
-            println!("Writing to the screen");
             if *lock > 0 {
                 println!("Stop Monitoring: 👻 💀 ☠️ 👽 👾 🤖 🎃 😺 😸 😹 😻 😼 😽 🙀 😿 😾");
                 break 'outer;
@@ -177,33 +176,31 @@ async fn main() {
         }
     });
 
+    // let handle_something_to_run = tokio::spawn(async {loop{sleep(Duration::from_millis(3000)).await;println!("We are working");}}) ;
+
     let handle_monitor = tokio::spawn(async move {
         // Do some async work
         if let Some(process_name) = ret.0 {
             run_monitor(&process_name, flag1).await;
         } else {
-            loop
-            {
+            let flag4 = Arc::clone(&flag1);
+            let mut savedprocessedname : String = "".to_string();
+            while *(flag4.lock().await) == 0 {
+                // println!("lockr is {}",lockr);
                 let flag3 = Arc::clone(&flag1);
-                let flag4 = Arc::clone(&flag1);
-                let lock = flag4.lock().await;
-                if *lock > 0
-                {
-                    println!("Stop monitoring!  😈 😈 😈 😈 😈");
-                    break;
-                }
-                let lock = process1.lock().await;
-                 if (*lock).len() > 0 {
-                    let process_name = (*lock).clone();
-                    println!("The user wants {}",process_name);
+                let process_name = (*process1.lock().await).clone();
+                if process_name.len() > 0 && (process_name != savedprocessedname) {
+                    println!("The user wants {} and {}", process_name,savedprocessedname);
+                    savedprocessedname = process_name.clone();
                     run_monitor(&process_name, flag3).await;
                 }
-                sleep(Duration::from_millis(1)).await;
+                sleep(Duration::from_millis(500)).await;
             }
         }
     });
     let res1 = handle_monitor.await;
     let res2 = handle_read.await;
+    // if handle_something_to_run.await.is_err() {};
     if res1.is_err() {
         println!("Something went wrong with the monitor");
     }

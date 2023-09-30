@@ -1,8 +1,9 @@
-use clap::{Arg, ArgAction, Command};
+use clap::{value_parser, Arg, ArgAction, Command};
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::prelude::*;
+use std::path::PathBuf;
 use std::process;
 use std::sync::Arc;
 use std::time::Instant;
@@ -10,6 +11,8 @@ use sysinfo::{DiskUsage, Pid, ProcessExt, System, SystemExt};
 use tokio;
 use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
+mod runner;
+use runner::run_process;
 pub struct Monitor {
     sys: System,
     pid: Pid,
@@ -41,13 +44,19 @@ impl Monitor {
         }
     }
 }
-fn parse_cli() -> (Option<String>, Vec<String>) {
+fn parse_cli() -> (Option<String>, Option<PathBuf>, Vec<String>) {
     let matches = Command::new("perf")
         .version("1.01")
         .author("Alex Semenov")
         .about("Monitoring tools")
         .arg(Arg::new("args").action(ArgAction::Append))
         .arg(Arg::new("process").short('p').long("process"))
+        .arg(
+            Arg::new("path_exe")
+                .short('e')
+                .long("exe")
+                .value_parser(value_parser!(PathBuf)),
+        )
         .get_matches();
     let args = matches
         .get_many::<String>("args")
@@ -55,9 +64,11 @@ fn parse_cli() -> (Option<String>, Vec<String>) {
         .map(|v| v.to_owned())
         .collect::<Vec<_>>();
     if let Some(process) = matches.get_one::<String>("process") {
-        (Some(process.to_owned()), args)
+        (Some(process.to_owned()), None, args)
+    } else if let Some(path) = matches.get_one::<PathBuf>("path_exe") {
+        (None, Some(path.to_owned()), args)
     } else {
-        (None, args)
+        (None, None, args)
     }
 }
 
@@ -86,15 +97,13 @@ async fn read_command(process_name: Arc<Mutex<String>>) -> bool {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn convert_cpu(cpu:f32)->f32
-{
+fn convert_cpu(cpu: f32) -> f32 {
     cpu
 }
 
 #[cfg(target_os = "macos")]
-fn convert_cpu(cpu:f32)->f32
-{
-    cpu*100.0f32
+fn convert_cpu(cpu: f32) -> f32 {
+    cpu * 100.0f32
 }
 
 async fn write_log(
@@ -109,7 +118,6 @@ async fn write_log(
         let disk_info: (u64, u64, u64, u64);
         let res = mon.monitor();
         if let Some((mem, cpu, diskutil)) = res {
-
             cpu_usage = convert_cpu(cpu);
             memory_usage = mem;
             disk_info = (
@@ -140,7 +148,7 @@ async fn write_log(
 
         let total_sleep_time = 30u64; // needs to be supplied by the user
         let mut current_sleep = 0u64;
-        let increment = 5u64;// needs to be supplied by the user
+        let increment = 5u64; // needs to be supplied by the user
         while current_sleep < total_sleep_time {
             let lock = flag.lock().await;
             if *lock > 0 {
@@ -169,7 +177,7 @@ async fn run_monitor(process_name: &str, flag: Arc<Mutex<i32>>) {
             .unwrap();
         let writer_f = write_log(&mut mon, &start_time, &mut file, flag);
         writer_f.await;
-    }
+    }else{println!("Process not found :{}",process_name)}
 }
 #[tokio::main]
 async fn main() {
@@ -194,14 +202,34 @@ async fn main() {
         // Do some async work
         if let Some(process_name) = ret.0 {
             run_monitor(&process_name, flag1).await;
+        } else if let Some(path_exe) = ret.1 {
+            let (tx, rx) = tokio::sync::oneshot::channel::<u32>();
+            let process_name = path_exe.file_name().unwrap().to_str().unwrap().to_string();
+            println!("The process name is {}",process_name);
+
+           tokio::spawn(async move {if !tx.send(1).is_err(){let _ = run_process(&path_exe, &ret.2).await;};});
+           let flag4 = Arc::clone(&flag1);
+           let flag3 = Arc::clone(&flag1);
+                // println!("lockr is {}",lockr);
+                match rx.await {
+                    Ok(_) =>run_monitor(&process_name, flag3).await,
+                    Err(_) => println!("the sender dropped"),
+                }
+                loop {
+                    if* (flag4.lock().await) != 0
+                    {
+                        println!("Aborting!");
+                        process::exit(0x0100);
+                       } 
+
+                }
         } else {
             let mut set_of_process_of_interest: HashSet<String> = HashSet::new();
-            for pr in ret.1 {
+            for pr in ret.2 {
                 set_of_process_of_interest.insert(pr);
             }
-
-            let flag4 = Arc::clone(&flag1);
             let mut savedprocessedname: String = "".to_string();
+            let flag4 = Arc::clone(&flag1);
             while *(flag4.lock().await) == 0 {
                 // println!("lockr is {}",lockr);
                 let flag3 = Arc::clone(&flag1);

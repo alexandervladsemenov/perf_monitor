@@ -27,11 +27,18 @@ if __name__ == "__main__":
     parser.add_argument("--ifile", nargs='*', type=str,
                         help="Provide a list of files to analyze",
                         default=None)
+    parser.add_argument("--odir", type=str,
+                        help="Provide output directory",
+                        default=None)
     files = [os.path.join("../", x)
              for x in os.listdir("../") if ".txt" in x and "log" in x]
+    outdir = "./"
+
     args = parser.parse_args()
     if args.ifile:
         files = args.ifile
+    if args.odir:
+        outdir = args.odir
     print(files)
     for file in files:
         time = []
@@ -68,13 +75,13 @@ if __name__ == "__main__":
         plt.title("Memory usage")
         plt.xlabel("Time, ms")
         plt.ylabel("Memory RAM, MG")
-        plt.show()
+        plt.savefig(os.path.join(outdir,f"MEM_{p_name}_{pid}.png"))
         plt.close()
         plt.plot(time, cpu_usage)
         plt.title("CPU usage")
         plt.xlabel("Time, ms")
         plt.ylabel("CPU usage, %")
-        plt.show()
+        plt.savefig(os.path.join(outdir,f"CPU_{p_name}_{pid}.png"))
         plt.close()
         plt.plot(time, write_bytes/1024.0)
         plt.title("Written bytes")

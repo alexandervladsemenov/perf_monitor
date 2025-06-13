@@ -85,7 +85,7 @@ async fn read_command(process_name: Arc<Mutex<String>>) -> bool {
             let trimmed = res.trim();
             if trimmed.eq("END") {
                 println!(
-                    "ENDING THE PROGRAM 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥸 🤩 🥳 😏",
+                    "ENDING THE PROGRAM",
                 );
                 return true;
             } else {

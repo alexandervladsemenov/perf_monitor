@@ -45,7 +45,7 @@ impl Monitor {
     }
 }
 fn parse_cli() -> (Option<String>, Option<PathBuf>, Vec<String>) {
-    let matches = Command::new("perf")
+    let matches = Command::new("perf").arg_required_else_help(true)
         .version("1.01")
         .author("Alex Semenov")
         .about("Monitoring tools")

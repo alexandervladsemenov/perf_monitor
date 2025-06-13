@@ -127,7 +127,7 @@ async fn write_log(
                 diskutil.total_written_bytes,
             );
         } else {
-            println!("Process has ended 💖💖💖💖💖\n");
+            println!("Process has ended\n");
             break 'outer;
         }
         let end = Instant::now();
@@ -152,7 +152,7 @@ async fn write_log(
         while current_sleep < total_sleep_time {
             let lock = flag.lock().await;
             if *lock > 0 {
-                println!("Stop Monitoring: 👻 💀 ☠️ 👽 👾 🤖 🎃 😺 😸 😹 😻 😼 😽 🙀 😿 😾");
+                println!("Stop Monitoring");
                 break 'outer;
             }
             sleep(Duration::from_millis(increment)).await;
